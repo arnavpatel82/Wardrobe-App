@@ -1,16 +1,34 @@
 import SwiftUI
 
-struct WardrobeApp: View {
-    var body: some View {
-        TabView {
-            ClosetView()
-                .tabItem {
-                    Label("Closet", systemImage: "house.fill")
-                }
+@main
+struct WardrobeApp: App {
+    var body: some Scene {
+        WindowGroup {
+            TabView {
+                ClosetView()
+                    .tabItem {
+                        Label("Closet", systemImage: "tshirt.fill")
+                    }
+                
+                OutfitsView()
+                    .tabItem {
+                        Label("Outfits", systemImage: "person.crop.rectangle.stack.fill")
+                    }
+            }
         }
     }
 }
 
 #Preview {
-    WardrobeApp()
+    TabView {
+        ClosetView()
+            .tabItem {
+                Label("Closet", systemImage: "tshirt.fill")
+            }
+        
+        OutfitsView()
+            .tabItem {
+                Label("Outfits", systemImage: "person.crop.rectangle.stack.fill")
+            }
+    }
 }

@@ -1,0 +1,234 @@
+//
+//  Copyright © 2023 Artizans. All rights reserved.
+//
+
+import CoreImage
+import Foundation
+import UIKit
+
+// MARK: Remove Background API
+
+//#error("Please input your apiKey below")
+private let apiKey: String = "sandbox_0d96316e3f6e6b5d808cdf6e3b491ac3c19ea598"
+
+private enum K {
+    static let hostURL = URL(string: "https://sdk.photoroom.com/v1/segment")!
+}
+
+public func removeBackground(
+    of image: UIImage
+) async throws -> UIImage {
+    let apiKey = "YOUR_PHOTOROOM_API_KEY" // 👈 Replace with your API key
+    let url = URL(string: "https://sdk.photoroom.com/v1/segment")!
+    var request = URLRequest(url: url)
+    request.httpMethod = "POST"
+    request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+    
+    let boundary = UUID().uuidString
+    request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+    
+    var body = Data()
+    
+    // Add image data
+    body.append("--\(boundary)\r\n".data(using: .utf8)!)
+    body.append("Content-Disposition: form-data; name=\"image_file\"; filename=\"image.jpg\"\r\n".data(using: .utf8)!)
+    body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+    body.append(image.jpegData(compressionQuality: 0.8)!)
+    body.append("\r\n".data(using: .utf8)!)
+    
+    // Add format parameter
+    body.append("--\(boundary)\r\n".data(using: .utf8)!)
+    body.append("Content-Disposition: form-data; name=\"format\"\r\n\r\n".data(using: .utf8)!)
+    body.append("png\r\n".data(using: .utf8)!)
+    
+    // Add bg_color parameter
+    body.append("--\(boundary)\r\n".data(using: .utf8)!)
+    body.append("Content-Disposition: form-data; name=\"bg_color\"\r\n\r\n".data(using: .utf8)!)
+    body.append("transparent\r\n".data(using: .utf8)!)
+    
+    body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+    
+    request.httpBody = body
+    
+    let (data, response) = try await URLSession.shared.data(for: request)
+    
+    guard let httpResponse = response as? HTTPURLResponse,
+          httpResponse.statusCode == 200,
+          let processedImage = UIImage(data: data) else {
+        throw NSError(domain: "RemoveBackground", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to process image"])
+    }
+    
+    return processedImage
+}
+
+public enum RemoveBackgroundError: Error {
+    case invalidData
+    case serverError
+    case noAPIKey
+}
+
+extension RemoveBackgroundError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .invalidData:
+            return NSLocalizedString("Data of image is not valid.", comment: "")
+        case .serverError:
+            return NSLocalizedString("There was a server error.", comment: "")
+        case .noAPIKey:
+            return NSLocalizedString("There is no key for the PhotoRoom API.", comment: "")
+        }
+    }
+}
+
+// MARK: Private Helpers
+
+private func generateBoundary() -> String {
+    return "Boundary-\(NSUUID().uuidString)"
+}
+
+private func createDataBody(with media: Media, boundary: String) -> Data {
+    let lineBreak = "\r\n"
+    var body = Data()
+
+    body.appendString("--\(boundary + lineBreak)")
+    body.appendString("Content-Disposition: form-data; name=\"\(media.key)\"; filename=\"\(media.fileName)\"\(lineBreak)")
+    body.appendString("Content-Type: \(media.mimeType + lineBreak + lineBreak)")
+    body.append(media.data)
+    body.appendString(lineBreak)
+    body.appendString("--\(boundary)--\(lineBreak)")
+
+    return body
+}
+
+private struct Media {
+    let key: String
+    let fileName: String
+    let data: Data
+    let mimeType: String
+
+    init?(withImage image: UIImage, forKey key: String) {
+        self.key = key
+        self.mimeType = "image/jpg"
+        self.fileName = "\(arc4random()).jpeg"
+
+        guard let data = image.jpegData(compressionQuality: 0.7) else { return nil }
+        self.data = data
+    }
+}
+
+private extension Data {
+    mutating func appendString(_ string: String) {
+        let data = string.data(using: .utf8)
+        append(data!)
+    }
+}
+
+private extension UIImage {
+    func scaled(by scale: CGFloat) -> UIImage {
+        guard let ciImage = CIImage(image: self, options: [.applyOrientationProperty: true]),
+              let scaledCGImage = ciImage.scaled(by: scale).toCGImage() else {
+            return self
+        }
+        return UIImage(cgImage: scaledCGImage)
+    }
+
+    func scaled(maxDimensions: CGSize) -> CGFloat {
+        let scale = min(maxDimensions.width / size.width, maxDimensions.height / size.height)
+        if scale >= 1 {
+            return 1
+        }
+        return scale
+    }
+}
+
+private extension CIImage {
+    func scaled(by scale: CGFloat) -> CIImage {
+        guard scale < 1 else { return self }
+        return applyingFilter(
+            "CILanczosScaleTransform",
+            parameters: [
+                kCIInputScaleKey: Float(scale),
+                kCIInputAspectRatioKey: 1,
+            ]
+        )
+    }
+
+    func toCGImage(monochrome: Bool = false) -> CGImage? {
+        let colorSpaceName: CFString
+        let format: CIFormat
+        let image: CIImage
+        let bpp: Int
+        let bitmapInfo: UInt32
+        if monochrome {
+            format = .L8
+            colorSpaceName = CGColorSpace.linearGray
+            image = premultiplyingAlpha()
+            bpp = 1
+            bitmapInfo = CGImageAlphaInfo.none.rawValue
+        } else {
+            format = .BGRA8
+            colorSpaceName = CGColorSpace.sRGB
+            image = self
+            bpp = 4
+            bitmapInfo = CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+        }
+
+        let w = Int(ceil(extent.width))
+        let h = Int(ceil(extent.height))
+        // Requiring a row alignment on 16 bytes boundaries for extra safety
+        let bpr = 16 * ((w * bpp + 15) / 16)
+
+        guard
+            let bitmapContext = CGContext(
+                data: nil,
+                width: w,
+                height: h,
+                bitsPerComponent: 8,
+                bytesPerRow: bpr,
+                space: CGColorSpace(name: colorSpaceName)!,
+                bitmapInfo: bitmapInfo
+            ),
+            let bitmapData = bitmapContext.data
+        else {
+            return nil
+        }
+
+        let destination = CIRenderDestination(
+            bitmapData: bitmapData,
+            width: w,
+            height: h,
+            bytesPerRow: bpr,
+            format: format
+        )
+        destination.colorSpace = CGColorSpace(name: colorSpaceName)
+
+        guard
+            let task = try? CIContextWrapper().context.startTask(
+                toRender: image,
+                from: extent,
+                to: destination,
+                at: .zero
+            ),
+            (try? task.waitUntilCompleted()) != nil
+        else {
+            return nil
+        }
+
+        return bitmapContext.makeImage()
+    }
+}
+
+private final class CIContextWrapper {
+    let context = CIContextWrapper.context
+
+    private static let context = CIContext(
+        options: [
+            .useSoftwareRenderer: false,
+            .cacheIntermediates: false,
+        ]
+    )
+
+    deinit {
+        context.clearCaches()
+    }
+}

@@ -1,68 +1,44 @@
 import SwiftUI
 import PhotosUI
+import CoreData
 
 struct AddClothingItemView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Binding var items: [ClothingItem]
-    let category: String
+    let category: Category
+    let onSave: (UIImage) -> Void
     
+    @Environment(\.dismiss) private var dismiss
     @State private var selectedItem: PhotosPickerItem?
     @State private var selectedImage: UIImage?
     @State private var processedImage: UIImage?
     @State private var isProcessing = false
-    @State private var showError = false
-    @State private var errorMessage = ""
-    
-    // Replace this with your actual API key
-    private let photoRoomService = PhotoRoomService(apiKey: "sandbox_0d96316e3f6e6b5d808cdf6e3b491ac3c19ea598")
+    @State private var errorMessage: String?
     
     var body: some View {
         NavigationView {
             VStack {
-                PhotosPicker(selection: $selectedItem, matching: .images) {
-                    if let processedImage {
-                        Image(uiImage: processedImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: 300)
-                            .cornerRadius(12)
-                    } else if let selectedImage {
-                        Image(uiImage: selectedImage)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxHeight: 300)
-                            .cornerRadius(12)
-                    } else {
+                if let image = processedImage ?? selectedImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxHeight: 400)
+                        .padding()
+                } else {
+                    PhotosPicker(selection: $selectedItem, matching: .images) {
                         VStack {
                             Image(systemName: "photo")
-                                .font(.system(size: 40))
-                                .foregroundColor(.gray)
+                                .font(.largeTitle)
                             Text("Select Photo")
-                                .foregroundColor(.gray)
+                                .font(.headline)
                         }
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 300)
+                        .frame(maxWidth: .infinity, maxHeight: 400)
                         .background(Color.gray.opacity(0.1))
                         .cornerRadius(12)
+                        .padding()
                     }
-                }
-                .disabled(isProcessing)
-                
-                if isProcessing {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                        Text("Removing background...")
-                            .foregroundColor(.gray)
-                        Spacer()
-                    }
-                    .padding()
                 }
                 
                 Spacer()
             }
-            .padding()
             .navigationTitle("Add Item")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -71,11 +47,15 @@ struct AddClothingItemView: View {
                         dismiss()
                     }
                 }
+                
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
-                        saveItem()
+                        if let image = processedImage ?? selectedImage {
+                            onSave(image)
+                            dismiss()
+                        }
                     }
-                    .disabled(processedImage == nil)
+                    .disabled(processedImage == nil && selectedImage == nil)
                 }
             }
             .onChange(of: selectedItem) { newItem in
@@ -87,40 +67,40 @@ struct AddClothingItemView: View {
                     }
                 }
             }
-            .alert("Error", isPresented: $showError) {
-                Button("OK", role: .cancel) { }
+            .overlay {
+                if isProcessing {
+                    ProgressView("Removing background...")
+                        .padding()
+                        .background(Color(.systemBackground))
+                        .cornerRadius(12)
+                        .shadow(radius: 10)
+                }
+            }
+            .alert("Error", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") {
+                    errorMessage = nil
+                }
             } message: {
-                Text(errorMessage)
+                if let errorMessage = errorMessage {
+                    Text(errorMessage)
+                }
             }
         }
     }
     
     private func processImage(_ image: UIImage) async {
         isProcessing = true
+        defer { isProcessing = false }
+        
         do {
-            processedImage = try await photoRoomService.removeBackground(from: image)
+            processedImage = try await removeBackground(of: image)
         } catch {
             errorMessage = "Failed to remove background: \(error.localizedDescription)"
-            showError = true
-            processedImage = image // Fallback to original image
         }
-        isProcessing = false
     }
-    
-    private func saveItem() {
-        guard let image = processedImage else { return }
-        
-        var newItem = ClothingItem(
-            name: "",
-            category: category,
-            color: "",
-            season: [],
-            notes: "",
-            dateAdded: Date()
-        )
-        newItem.setImage(image)
-        
-        items.append(newItem)
-        dismiss()
-    }
+}
+
+#Preview {
+    AddClothingItemView(category: Category(context: CoreDataManager.preview.viewContext)) { _ in }
 } 
+
