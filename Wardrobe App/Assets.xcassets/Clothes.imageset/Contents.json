@@ -1,14 +1,17 @@
 {
   "images" : [
     {
+      "filename" : "KIC_355-4265-00230-276_prod1.jpg",
       "idiom" : "universal",
       "scale" : "1x"
     },
     {
+      "filename" : "e911b6aa-cee1-4df2-b322-ad01308b5165.jpeg",
       "idiom" : "universal",
       "scale" : "2x"
     },
     {
+      "filename" : "7b17428dc1da8df6b8b054f8729b58bd8d06e60a.jpg",
       "idiom" : "universal",
       "scale" : "3x"
     }
