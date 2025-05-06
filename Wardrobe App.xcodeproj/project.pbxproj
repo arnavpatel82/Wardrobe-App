@@ -7,7 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		A41C65BA2DC7205C005E01D2 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A41C65B92DC7205C005E01D2 /* GoogleService-Info.plist */; };
 		A41C65BD2DC720E9005E01D2 /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = A41C65BC2DC720E9005E01D2 /* FirebaseAnalytics */; };
 		A41C65BF2DC720E9005E01D2 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
 		A41C65C12DC720E9005E01D2 /* (null) in Frameworks */ = {isa = PBXBuildFile; };
@@ -79,7 +78,6 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A41C65B92DC7205C005E01D2 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
 		A42E698B2D99DA7B00EE3523 /* Wardrobe App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Wardrobe App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A42E699B2D99DA7C00EE3523 /* Wardrobe AppTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Wardrobe AppTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		A42E69A52D99DA7C00EE3523 /* Wardrobe AppUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Wardrobe AppUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -186,7 +184,6 @@
 				A42E699E2D99DA7C00EE3523 /* Wardrobe AppTests */,
 				A42E69A82D99DA7C00EE3523 /* Wardrobe AppUITests */,
 				A42E698C2D99DA7B00EE3523 /* Products */,
-				A41C65B92DC7205C005E01D2 /* GoogleService-Info.plist */,
 			);
 			sourceTree = "<group>";
 		};
@@ -351,7 +348,6 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A41C65BA2DC7205C005E01D2 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
