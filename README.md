@@ -4,7 +4,7 @@ A modern iOS application that helps you organize and manage your clothing items,
 
 ## Demo
 
-[Watch Demo Video](Wardrobe%20App/Resources/demo.mp4)
+[Watch Demo Video](https://drive.google.com/file/d/1DOOqjuGfVI8GX5zHFP-70Z027URHUbRB/view?usp=sharing)
 
 ## Features
 
