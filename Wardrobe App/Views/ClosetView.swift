@@ -55,10 +55,9 @@ struct ClosetView: View {
             }
             .sheet(isPresented: $showingAddItem) {
                 if let category = selectedCategory {
-                    AddClothingItemView(category: category) { image in
-                        CoreDataManager.shared.saveClothingItem(category: category, image: image)
+                    AddClothingItemView(category: category, onItemAdded: {
                         loadCategories()
-                    }
+                    })
                 }
             }
             .alert("Add Category", isPresented: $showingAddCategory) {

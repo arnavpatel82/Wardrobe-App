@@ -44,9 +44,10 @@ struct CategoryDetailView: View {
             }
         }
         .sheet(isPresented: $showingAddItem) {
-            AddClothingItemView(category: category) { image in
-                saveItem(image: image)
-            }
+            AddClothingItemView(category: category, onItemAdded: {
+                loadItems()
+                onItemsChanged()
+            })
         }
         .alert("Delete Item", isPresented: $showingDeleteAlert) {
             Button("Cancel", role: .cancel) { }
@@ -98,7 +99,7 @@ struct ClothingItemCard: View {
     let item: ClothingItem
     
     var body: some View {
-        if let imageData = item.imageData,
+        if let imageData = item.image,
            let uiImage = UIImage(data: imageData) {
             Image(uiImage: uiImage)
                 .resizable()

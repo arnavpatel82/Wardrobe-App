@@ -20,45 +20,10 @@ struct CreateOutfitView: View {
                         .foregroundColor(.secondary)
                 } else {
                     ForEach(categories) { category in
-                        Section(header: Text(category.name ?? "Unnamed")) {
-                            if let items = category.items?.allObjects as? [ClothingItem] {
-                                ForEach(items) { item in
-                                    HStack {
-                                        if let imageData = item.imageData,
-                                           let image = UIImage(data: imageData) {
-                                            Image(uiImage: image)
-                                                .resizable()
-                                                .scaledToFill()
-                                                .frame(width: 60, height: 60)
-                                                .clipShape(RoundedRectangle(cornerRadius: 8))
-                                        } else {
-                                            RoundedRectangle(cornerRadius: 8)
-                                                .fill(Color.gray.opacity(0.1))
-                                                .frame(width: 60, height: 60)
-                                                .overlay {
-                                                    Image(systemName: "tshirt")
-                                                        .foregroundColor(.gray)
-                                                }
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        if selectedItems.contains(item) {
-                                            Image(systemName: "checkmark.circle.fill")
-                                                .foregroundColor(.blue)
-                                        }
-                                    }
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        if selectedItems.contains(item) {
-                                            selectedItems.remove(item)
-                                        } else {
-                                            selectedItems.insert(item)
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        CategorySection(
+                            category: category,
+                            selectedItems: $selectedItems
+                        )
                     }
                 }
             }
@@ -137,6 +102,67 @@ struct CreateOutfitView: View {
         } catch {
             print("Error updating outfit: \(error)")
         }
+    }
+}
+
+struct CategorySection: View {
+    let category: Category
+    @Binding var selectedItems: Set<ClothingItem>
+    
+    var body: some View {
+        Section(header: Text(category.name ?? "Unnamed")) {
+            if let items = category.items?.allObjects as? [ClothingItem] {
+                ForEach(items) { item in
+                    ClothingItemRow(
+                        item: item,
+                        isSelected: selectedItems.contains(item),
+                        onTap: {
+                            if selectedItems.contains(item) {
+                                selectedItems.remove(item)
+                            } else {
+                                selectedItems.insert(item)
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+struct ClothingItemRow: View {
+    let item: ClothingItem
+    let isSelected: Bool
+    let onTap: () -> Void
+    
+    var body: some View {
+        HStack {
+            if let imageData = item.image,
+               let image = UIImage(data: imageData) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 60, height: 60)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.gray.opacity(0.1))
+                    .frame(width: 60, height: 60)
+                    .overlay {
+                        Image(systemName: "tshirt")
+                            .foregroundColor(.gray)
+                    }
+            }
+            
+            Spacer()
+            
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.blue)
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture(perform: onTap)
     }
 }
 

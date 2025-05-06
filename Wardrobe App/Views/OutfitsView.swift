@@ -107,7 +107,7 @@ struct OutfitDetailView: View {
             if let items = outfit.items?.allObjects as? [ClothingItem] {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 160))], spacing: 16) {
                     ForEach(items) { item in
-                        if let imageData = item.imageData,
+                        if let imageData = item.image,
                            let image = UIImage(data: imageData) {
                             Image(uiImage: image)
                                 .resizable()
@@ -207,7 +207,7 @@ struct OutfitCard: View {
         
         // Draw each item in the grid
         for (index, item) in items.enumerated() {
-            if let imageData = item.imageData,
+            if let imageData = item.image,
                let image = UIImage(data: imageData) {
                 // Calculate position in grid
                 let row = index / columns

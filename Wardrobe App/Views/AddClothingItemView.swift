@@ -3,41 +3,42 @@ import PhotosUI
 import CoreData
 
 struct AddClothingItemView: View {
-    let category: Category
-    let onSave: (UIImage) -> Void
-    
     @Environment(\.dismiss) private var dismiss
     @State private var selectedItem: PhotosPickerItem?
     @State private var selectedImage: UIImage?
-    @State private var processedImage: UIImage?
+    @State private var itemDescription: String = ""
     @State private var isProcessing = false
-    @State private var errorMessage: String?
+    @State private var showingError = false
+    @State private var errorMessage = ""
+    
+    let category: Category
+    let onItemAdded: () -> Void
+    
+    init(category: Category, onItemAdded: @escaping () -> Void) {
+        self.category = category
+        self.onItemAdded = onItemAdded
+    }
     
     var body: some View {
         NavigationView {
-            VStack {
-                if let image = processedImage ?? selectedImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFit()
-                        .frame(maxHeight: 400)
-                        .padding()
-                } else {
+            Form {
+                Section {
                     PhotosPicker(selection: $selectedItem, matching: .images) {
-                        VStack {
-                            Image(systemName: "photo")
-                                .font(.largeTitle)
-                            Text("Select Photo")
-                                .font(.headline)
+                        if let selectedImage {
+                            Image(uiImage: selectedImage)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxHeight: 200)
+                        } else {
+                            Label("Select Photo", systemImage: "photo")
                         }
-                        .frame(maxWidth: .infinity, maxHeight: 400)
-                        .background(Color.gray.opacity(0.1))
-                        .cornerRadius(12)
-                        .padding()
                     }
                 }
                 
-                Spacer()
+                Section {
+                    TextField("Description (e.g., 'Blue cotton t-shirt with white stripes')", text: $itemDescription, axis: .vertical)
+                        .lineLimit(3...6)
+                }
             }
             .navigationTitle("Add Item")
             .navigationBarTitleDisplayMode(.inline)
@@ -49,13 +50,10 @@ struct AddClothingItemView: View {
                 }
                 
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        if let image = processedImage ?? selectedImage {
-                            onSave(image)
-                            dismiss()
-                        }
+                    Button("Add") {
+                        addItem()
                     }
-                    .disabled(processedImage == nil && selectedImage == nil)
+                    .disabled(selectedImage == nil || isProcessing)
                 }
             }
             .onChange(of: selectedItem) { newItem in
@@ -63,44 +61,59 @@ struct AddClothingItemView: View {
                     if let data = try? await newItem?.loadTransferable(type: Data.self),
                        let image = UIImage(data: data) {
                         selectedImage = image
-                        await processImage(image)
                     }
                 }
             }
-            .overlay {
-                if isProcessing {
-                    ProgressView("Removing background...")
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(12)
-                        .shadow(radius: 10)
-                }
-            }
-            .alert("Error", isPresented: .constant(errorMessage != nil)) {
-                Button("OK") {
-                    errorMessage = nil
-                }
+            .alert("Error", isPresented: $showingError) {
+                Button("OK", role: .cancel) { }
             } message: {
-                if let errorMessage = errorMessage {
-                    Text(errorMessage)
-                }
+                Text(errorMessage)
             }
         }
     }
     
-    private func processImage(_ image: UIImage) async {
-        isProcessing = true
-        defer { isProcessing = false }
+    private func addItem() {
+        guard let image = selectedImage else { return }
         
-        do {
-            processedImage = try await removeBackground(of: image)
-        } catch {
-            errorMessage = "Failed to remove background: \(error.localizedDescription)"
+        isProcessing = true
+        
+        Task {
+            do {
+                // Create the clothing item
+                let item = ClothingItem(context: CoreDataManager.shared.viewContext)
+                item.id = UUID()
+                item.category = category
+                item.itemDescription = itemDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                // Try to process the image to remove background
+                do {
+                    let processedImage = try await removeBackground(of: image)
+                    item.image = processedImage.jpegData(compressionQuality: 0.8)
+                } catch {
+                    print("Failed to remove background, using original image: \(error)")
+                    item.image = image.jpegData(compressionQuality: 0.8)
+                }
+                
+                // Save to CoreData
+                try CoreDataManager.shared.viewContext.save()
+                
+                await MainActor.run {
+                    isProcessing = false
+                    onItemAdded()
+                    dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    isProcessing = false
+                    errorMessage = error.localizedDescription
+                    showingError = true
+                }
+            }
         }
     }
 }
 
 #Preview {
-    AddClothingItemView(category: Category(context: CoreDataManager.preview.viewContext)) { _ in }
+    AddClothingItemView(category: Category(), onItemAdded: {})
 } 
 

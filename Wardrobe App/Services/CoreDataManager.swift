@@ -4,101 +4,149 @@ import UIKit
 class CoreDataManager {
     static let shared = CoreDataManager()
     
-    private let container: NSPersistentContainer
+    private init() {}
     
-    // Add a preview context for SwiftUI previews
-    static var preview: CoreDataManager = {
-        let manager = CoreDataManager(inMemory: true)
-        return manager
-    }()
-    
-    // Add a preview context property
-    var viewContext: NSManagedObjectContext {
-        container.viewContext
-    }
-    
-    private init(inMemory: Bool = false) {
-        container = NSPersistentContainer(name: "WardrobeModel")
-        
-        if inMemory {
-            container.persistentStoreDescriptions.first?.url = URL(fileURLWithPath: "/dev/null")
-        }
-        
+    lazy var persistentContainer: NSPersistentContainer = {
+        let container = NSPersistentContainer(name: "WardrobeModel")
         container.loadPersistentStores { description, error in
             if let error = error {
-                print("Core Data failed to load: \(error.localizedDescription)")
+                fatalError("Unable to load persistent stores: \(error)")
             }
         }
+        return container
+    }()
+    
+    var viewContext: NSManagedObjectContext {
+        persistentContainer.viewContext
     }
     
-    // MARK: - Categories
+    // MARK: - Category Operations
+    
+    func saveCategory(name: String) {
+        let category = Category(context: viewContext)
+        category.id = UUID()
+        category.name = name
+        saveContext()
+    }
     
     func loadCategories() -> [Category] {
-        let request = NSFetchRequest<Category>(entityName: "Category")
+        let request: NSFetchRequest<Category> = Category.fetchRequest()
         request.sortDescriptors = [NSSortDescriptor(keyPath: \Category.name, ascending: true)]
         
         do {
-            return try container.viewContext.fetch(request)
+            return try viewContext.fetch(request)
         } catch {
-            print("Failed to fetch categories: \(error)")
+            print("Error loading categories: \(error)")
             return []
         }
     }
     
-    func saveCategory(name: String) {
-        let category = Category(context: container.viewContext)
-        category.name = name
-        
-        saveContext()
-    }
-    
     func deleteCategory(_ category: Category) {
-        container.viewContext.delete(category)
+        viewContext.delete(category)
         saveContext()
     }
     
-    // MARK: - Clothing Items
+    // MARK: - Clothing Item Operations
     
     func saveClothingItem(category: Category, image: UIImage) {
-        let item = ClothingItem(context: container.viewContext)
+        let item = ClothingItem(context: viewContext)
         item.id = UUID()
-        item.dateAdded = Date()
         item.category = category
-        
-        if let imageData = image.jpegData(compressionQuality: 0.7) {
-            item.imageData = imageData
-        }
-        
+        item.image = image.jpegData(compressionQuality: 0.8)
         saveContext()
     }
     
     func loadClothingItems(forCategory category: Category) -> [ClothingItem] {
-        let request = NSFetchRequest<ClothingItem>(entityName: "ClothingItem")
+        let request: NSFetchRequest<ClothingItem> = ClothingItem.fetchRequest()
         request.predicate = NSPredicate(format: "category == %@", category)
-        request.sortDescriptors = [NSSortDescriptor(keyPath: \ClothingItem.dateAdded, ascending: false)]
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \ClothingItem.id, ascending: false)]
         
         do {
-            return try container.viewContext.fetch(request)
+            return try viewContext.fetch(request)
         } catch {
-            print("Failed to fetch items: \(error)")
+            print("Error loading clothing items: \(error)")
             return []
         }
     }
     
     func deleteClothingItem(_ item: ClothingItem) {
-        container.viewContext.delete(item)
+        viewContext.delete(item)
         saveContext()
     }
     
-    // MARK: - Context
+    // MARK: - Outfit Operations
     
-    private func saveContext() {
-        if container.viewContext.hasChanges {
+    func saveOutfit(name: String, items: [ClothingItem], image: UIImage? = nil) {
+        let outfit = Outfit(context: viewContext)
+        outfit.id = UUID()
+        outfit.name = name
+        outfit.image = image?.jpegData(compressionQuality: 0.8)
+        outfit.items = NSSet(array: items)
+        saveContext()
+    }
+    
+    func loadOutfits() -> [Outfit] {
+        let request: NSFetchRequest<Outfit> = Outfit.fetchRequest()
+        request.sortDescriptors = [NSSortDescriptor(keyPath: \Outfit.name, ascending: true)]
+        
+        do {
+            return try viewContext.fetch(request)
+        } catch {
+            print("Error loading outfits: \(error)")
+            return []
+        }
+    }
+    
+    func deleteOutfit(_ outfit: Outfit) {
+        viewContext.delete(outfit)
+        saveContext()
+    }
+    
+    // MARK: - Context Operations
+    
+    func saveContext() {
+        if viewContext.hasChanges {
             do {
-                try container.viewContext.save()
+                try viewContext.save()
             } catch {
-                print("Failed to save context: \(error)")
+                print("Error saving context: \(error)")
             }
         }
     }
+    
+    // MARK: - Preview Helper
+    
+    static var preview: CoreDataManager = {
+        let manager = CoreDataManager()
+        let viewContext = manager.persistentContainer.viewContext
+        
+        // Create sample categories
+        let topsCategory = Category(context: viewContext)
+        topsCategory.id = UUID()
+        topsCategory.name = "Tops"
+        
+        let bottomsCategory = Category(context: viewContext)
+        bottomsCategory.id = UUID()
+        bottomsCategory.name = "Bottoms"
+        
+        // Create sample clothing items
+        let shirt = ClothingItem(context: viewContext)
+        shirt.id = UUID()
+        shirt.category = topsCategory
+        shirt.image = UIImage(systemName: "tshirt")?.jpegData(compressionQuality: 0.8)
+        
+        let pants = ClothingItem(context: viewContext)
+        pants.id = UUID()
+        pants.category = bottomsCategory
+        pants.image = UIImage(systemName: "pants")?.jpegData(compressionQuality: 0.8)
+        
+        // Create sample outfit
+        let outfit = Outfit(context: viewContext)
+        outfit.id = UUID()
+        outfit.name = "Casual Look"
+        outfit.items = NSSet(array: [shirt, pants])
+        
+        try? viewContext.save()
+        return manager
+    }()
 } 
