@@ -3,7 +3,7 @@ import UIKit
 
 class ImageAnalysisService {
     static let shared = ImageAnalysisService()
-    private let apiKey = "AIzaSyDcmznpfXsybr2fRA46HUriUcZKH3ZbA-U"
+    private let apiKey = "YOUR_API_KEY_HERE"
     private let visionAPIEndpoint = "https://vision.googleapis.com/v1/images:annotate"
     
     private init() {}
