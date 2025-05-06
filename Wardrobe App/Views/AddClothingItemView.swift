@@ -8,6 +8,7 @@ struct AddClothingItemView: View {
     @State private var selectedImage: UIImage?
     @State private var itemDescription: String = ""
     @State private var isProcessing = false
+    @State private var isGeneratingDescription = false
     @State private var showingError = false
     @State private var errorMessage = ""
     
@@ -36,8 +37,29 @@ struct AddClothingItemView: View {
                 }
                 
                 Section {
-                    TextField("Description (e.g., 'Blue cotton t-shirt with white stripes')", text: $itemDescription, axis: .vertical)
-                        .lineLimit(3...6)
+                    HStack {
+                        TextField("Description (e.g., 'Blue cotton t-shirt with white stripes')", text: $itemDescription, axis: .vertical)
+                            .lineLimit(3...6)
+                        
+                        if let image = selectedImage {
+                            Button(action: {
+                                generateDescription(for: image)
+                            }) {
+                                Image(systemName: "wand.and.stars")
+                                    .foregroundColor(.blue)
+                            }
+                            .disabled(isGeneratingDescription)
+                        }
+                    }
+                    
+                    if isGeneratingDescription {
+                        HStack {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Generating description...")
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
             }
             .navigationTitle("Add Item")
@@ -68,6 +90,26 @@ struct AddClothingItemView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(errorMessage)
+            }
+        }
+    }
+    
+    private func generateDescription(for image: UIImage) {
+        isGeneratingDescription = true
+        
+        Task {
+            do {
+                let description = try await ImageAnalysisService.shared.analyzeImage(image)
+                await MainActor.run {
+                    itemDescription = description
+                    isGeneratingDescription = false
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to generate description: \(error.localizedDescription)"
+                    showingError = true
+                    isGeneratingDescription = false
+                }
             }
         }
     }
