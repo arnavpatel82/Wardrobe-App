@@ -6,6 +6,7 @@ struct AddClothingItemView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var selectedItem: PhotosPickerItem?
     @State private var selectedImage: UIImage?
+    @State private var processedImage: UIImage?
     @State private var itemDescription: String = ""
     @State private var isProcessing = false
     @State private var isGeneratingDescription = false
@@ -25,14 +26,26 @@ struct AddClothingItemView: View {
             Form {
                 Section {
                     PhotosPicker(selection: $selectedItem, matching: .images) {
-                        if let selectedImage {
-                            Image(uiImage: selectedImage)
+                        if let image = processedImage ?? selectedImage {
+                            Image(uiImage: image)
                                 .resizable()
                                 .scaledToFit()
                                 .frame(maxHeight: 200)
                         } else {
                             Label("Select Photo", systemImage: "photo")
                         }
+                    }
+                    
+                    if let selectedImage = selectedImage {
+                        Button(action: {
+                            processBackgroundRemoval()
+                        }) {
+                            HStack {
+                                Image(systemName: "wand.and.stars.inverse")
+                                Text("Remove Background")
+                            }
+                        }
+                        .disabled(isProcessing)
                     }
                 }
                 
@@ -83,6 +96,7 @@ struct AddClothingItemView: View {
                     if let data = try? await newItem?.loadTransferable(type: Data.self),
                        let image = UIImage(data: data) {
                         selectedImage = image
+                        processedImage = nil // Reset processed image when new image is selected
                     }
                 }
             }
@@ -90,6 +104,28 @@ struct AddClothingItemView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(errorMessage)
+            }
+        }
+    }
+    
+    private func processBackgroundRemoval() {
+        guard let image = selectedImage else { return }
+        
+        isProcessing = true
+        
+        Task {
+            do {
+                let processed = try await removeBackground(of: image)
+                await MainActor.run {
+                    processedImage = processed
+                    isProcessing = false
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Failed to remove background: \(error.localizedDescription)"
+                    showingError = true
+                    isProcessing = false
+                }
             }
         }
     }
@@ -115,7 +151,7 @@ struct AddClothingItemView: View {
     }
     
     private func addItem() {
-        guard let image = selectedImage else { return }
+        guard let image = processedImage ?? selectedImage else { return }
         
         isProcessing = true
         
@@ -126,15 +162,7 @@ struct AddClothingItemView: View {
                 item.id = UUID()
                 item.category = category
                 item.itemDescription = itemDescription.trimmingCharacters(in: .whitespacesAndNewlines)
-                
-                // Try to process the image to remove background
-                do {
-                    let processedImage = try await removeBackground(of: image)
-                    item.image = processedImage.jpegData(compressionQuality: 0.8)
-                } catch {
-                    print("Failed to remove background, using original image: \(error)")
-                    item.image = image.jpegData(compressionQuality: 0.8)
-                }
+                item.image = image.jpegData(compressionQuality: 0.8)
                 
                 // Save to CoreData
                 try CoreDataManager.shared.viewContext.save()
