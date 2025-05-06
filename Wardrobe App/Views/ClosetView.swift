@@ -3,9 +3,7 @@ import CoreData
 
 struct ClosetView: View {
     @State private var categories: [Category] = []
-    @State private var showingAddItem = false
     @State private var showingAddCategory = false
-    @State private var selectedCategory: Category?
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var newCategoryName = ""
@@ -35,29 +33,11 @@ struct ClosetView: View {
             .navigationTitle("My Closet")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button(action: {
-                            showingAddCategory = true
-                        }) {
-                            Label("Add Category", systemImage: "folder.badge.plus")
-                        }
-                        
-                        ForEach(categories) { category in
-                            Button(category.name ?? "Unnamed") {
-                                selectedCategory = category
-                                showingAddItem = true
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "plus")
+                    Button(action: {
+                        showingAddCategory = true
+                    }) {
+                        Image(systemName: "folder.badge.plus")
                     }
-                }
-            }
-            .sheet(isPresented: $showingAddItem) {
-                if let category = selectedCategory {
-                    AddClothingItemView(category: category, onItemAdded: {
-                        loadCategories()
-                    })
                 }
             }
             .alert("Add Category", isPresented: $showingAddCategory) {
