@@ -7,9 +7,8 @@ import Foundation
 import UIKit
 
 // MARK: Remove Background API
-
 //#error("Please input your apiKey below")
-private let apiKey: String = "sandbox_0d96316e3f6e6b5d808cdf6e3b491ac3c19ea598"
+private let apiKey: String = "0d96316e3f6e6b5d808cdf6e3b491ac3c19ea598"
 
 private enum K {
     static let hostURL = URL(string: "https://sdk.photoroom.com/v1/segment")!
@@ -18,47 +17,67 @@ private enum K {
 public func removeBackground(
     of image: UIImage
 ) async throws -> UIImage {
-    let apiKey = "YOUR_PHOTOROOM_API_KEY" // 👈 Replace with your API key
-    let url = URL(string: "https://sdk.photoroom.com/v1/segment")!
-    var request = URLRequest(url: url)
-    request.httpMethod = "POST"
-    request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-    
-    let boundary = UUID().uuidString
-    request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-    
-    var body = Data()
-    
-    // Add image data
-    body.append("--\(boundary)\r\n".data(using: .utf8)!)
-    body.append("Content-Disposition: form-data; name=\"image_file\"; filename=\"image.jpg\"\r\n".data(using: .utf8)!)
-    body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
-    body.append(image.jpegData(compressionQuality: 0.8)!)
-    body.append("\r\n".data(using: .utf8)!)
-    
-    // Add format parameter
-    body.append("--\(boundary)\r\n".data(using: .utf8)!)
-    body.append("Content-Disposition: form-data; name=\"format\"\r\n\r\n".data(using: .utf8)!)
-    body.append("png\r\n".data(using: .utf8)!)
-    
-    // Add bg_color parameter
-    body.append("--\(boundary)\r\n".data(using: .utf8)!)
-    body.append("Content-Disposition: form-data; name=\"bg_color\"\r\n\r\n".data(using: .utf8)!)
-    body.append("transparent\r\n".data(using: .utf8)!)
-    
-    body.append("--\(boundary)--\r\n".data(using: .utf8)!)
-    
-    request.httpBody = body
-    
-    let (data, response) = try await URLSession.shared.data(for: request)
-    
-    guard let httpResponse = response as? HTTPURLResponse,
-          httpResponse.statusCode == 200,
-          let processedImage = UIImage(data: data) else {
-        throw NSError(domain: "RemoveBackground", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to process image"])
+    return try await withCheckedThrowingContinuation { continuation in
+        removeBackground(of: image) { result in
+            continuation.resume(with: result)
+        }
     }
-    
-    return processedImage
+}
+
+@available(*, renamed: "removeBackground(of:)")
+public func removeBackground(
+    of image: UIImage,
+    completionHandler: @escaping (Result<UIImage, RemoveBackgroundError>) -> Void
+) {
+    guard apiKey.isEmpty == false else {
+        completionHandler(.failure(.noAPIKey))
+        return
+    }
+
+    var request = URLRequest(url: K.hostURL)
+    request.httpMethod = "POST"
+    request.timeoutInterval = 30.0
+
+    let scale = image.scaled(maxDimensions: CGSize(width: 1000, height: 1000))
+    let scaledImage = image.scaled(by: scale)
+
+    guard let media = Media(withImage: scaledImage, forKey: "image_file") else {
+        completionHandler(.failure(.invalidData))
+        return
+    }
+
+    let boundary = generateBoundary()
+    let body = createDataBody(with: media, boundary: boundary)
+
+    request.httpBody = body
+
+    request.addValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+    request.addValue(apiKey, forHTTPHeaderField: "X-Api-Key")
+
+    let config = URLSessionConfiguration.default
+    let session = URLSession(configuration: config)
+    let task = session.dataTask(with: request, completionHandler: { responseData, response, error in
+        guard let responseData = responseData,
+              let response = response as? HTTPURLResponse, error == nil else {
+            completionHandler(.failure(.serverError))
+            return
+        }
+
+        guard (200 ... 299) ~= response.statusCode else {
+            print("statusCode should be 2xx, but is \(response.statusCode)")
+            print("response = \(response)")
+            completionHandler(.failure(.serverError))
+            return
+        }
+
+        guard let decodedImage = UIImage(data: responseData) else {
+            print("Error decoding server response")
+            completionHandler(.failure(.serverError))
+            return
+        }
+        completionHandler(.success(decodedImage))
+    })
+    task.resume()
 }
 
 public enum RemoveBackgroundError: Error {
