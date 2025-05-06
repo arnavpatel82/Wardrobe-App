@@ -164,8 +164,20 @@ struct AddClothingItemView: View {
                 item.itemDescription = itemDescription.trimmingCharacters(in: .whitespacesAndNewlines)
                 item.image = image.jpegData(compressionQuality: 0.8)
                 
+                // Add the item to the category's items set
+                if category.items == nil {
+                    category.items = NSSet()
+                }
+                category.addToItems(item)
+                
                 // Save to CoreData
                 try CoreDataManager.shared.viewContext.save()
+                
+                print("Added new item:")
+                print("  - ID: \(item.id?.uuidString ?? "nil")")
+                print("  - Description: \(item.itemDescription ?? "no description")")
+                print("  - Category: \(category.name ?? "unnamed")")
+                print("  - Category items count: \(category.items?.count ?? 0)")
                 
                 await MainActor.run {
                     isProcessing = false

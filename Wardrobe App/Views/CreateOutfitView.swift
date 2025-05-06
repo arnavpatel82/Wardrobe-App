@@ -5,6 +5,7 @@ struct CreateOutfitView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var categories: [Category] = []
     @State private var selectedItems: Set<ClothingItem> = []
+    @State private var searchText = ""
     
     let editingOutfit: Outfit?
     
@@ -12,18 +13,45 @@ struct CreateOutfitView: View {
         self.editingOutfit = editingOutfit
     }
     
+    var filteredItems: [ClothingItem] {
+        if searchText.isEmpty {
+            return categories.flatMap { category in
+                (category.items?.allObjects as? [ClothingItem]) ?? []
+            }
+        }
+        
+        return categories.flatMap { category in
+            (category.items?.allObjects as? [ClothingItem])?.filter { item in
+                guard let description = item.itemDescription?.lowercased() else { return false }
+                return description.contains(searchText.lowercased())
+            } ?? []
+        }
+    }
+    
     var body: some View {
         NavigationView {
-            List {
-                if categories.isEmpty {
-                    Text("No items found")
-                        .foregroundColor(.secondary)
-                } else {
-                    ForEach(categories) { category in
-                        CategorySection(
-                            category: category,
-                            selectedItems: $selectedItems
-                        )
+            VStack {
+                SearchBar(text: $searchText)
+                    .padding(.horizontal)
+                
+                List {
+                    if filteredItems.isEmpty {
+                        Text("No items found")
+                            .foregroundColor(.secondary)
+                    } else {
+                        ForEach(filteredItems) { item in
+                            ClothingItemRow(
+                                item: item,
+                                isSelected: selectedItems.contains(item),
+                                onTap: {
+                                    if selectedItems.contains(item) {
+                                        selectedItems.remove(item)
+                                    } else {
+                                        selectedItems.insert(item)
+                                    }
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -65,10 +93,25 @@ struct CreateOutfitView: View {
         
         do {
             categories = try CoreDataManager.shared.viewContext.fetch(request)
-            print("Loaded \(categories.count) categories")
+            print("\n=== Loading Categories ===")
+            print("Total categories loaded: \(categories.count)")
+            
             for category in categories {
-                print("Category: \(category.name ?? "unnamed"), Items: \(category.items?.count ?? 0)")
+                print("\nCategory: \(category.name ?? "unnamed")")
+                print("Category ID: \(category.id?.uuidString ?? "nil")")
+                
+                if let items = category.items?.allObjects as? [ClothingItem] {
+                    print("Items count: \(items.count)")
+                    for item in items {
+                        print("  - Item ID: \(item.id?.uuidString ?? "nil")")
+                        print("    Description: \(item.itemDescription ?? "no description")")
+                        print("    Has image: \(item.image != nil)")
+                    }
+                } else {
+                    print("No items found or items is nil")
+                }
             }
+            print("=== End Loading Categories ===\n")
         } catch {
             print("Failed to fetch categories: \(error)")
         }
@@ -105,25 +148,23 @@ struct CreateOutfitView: View {
     }
 }
 
-struct CategorySection: View {
-    let category: Category
-    @Binding var selectedItems: Set<ClothingItem>
+struct SearchBar: View {
+    @Binding var text: String
     
     var body: some View {
-        Section(header: Text(category.name ?? "Unnamed")) {
-            if let items = category.items?.allObjects as? [ClothingItem] {
-                ForEach(items) { item in
-                    ClothingItemRow(
-                        item: item,
-                        isSelected: selectedItems.contains(item),
-                        onTap: {
-                            if selectedItems.contains(item) {
-                                selectedItems.remove(item)
-                            } else {
-                                selectedItems.insert(item)
-                            }
-                        }
-                    )
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.gray)
+            
+            TextField("Search items...", text: $text)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+            
+            if !text.isEmpty {
+                Button(action: {
+                    text = ""
+                }) {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.gray)
                 }
             }
         }
@@ -152,6 +193,13 @@ struct ClothingItemRow: View {
                         Image(systemName: "tshirt")
                             .foregroundColor(.gray)
                     }
+            }
+            
+            VStack(alignment: .leading) {
+                if let description = item.itemDescription {
+                    Text(description)
+                        .lineLimit(2)
+                }
             }
             
             Spacer()
